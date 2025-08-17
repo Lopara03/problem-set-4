@@ -12,45 +12,52 @@ import numpy as np
 import pandas as pd
 import networkx as nx
 import json
+from datetime import datetime
+
 
 # Build the graph
 g = nx.Graph()
 
-# Set up your dataframe(s) -> the df that's output to a CSV should include at least the columns 'left_actor_name', '<->', 'right_actor_name'
 
+# i had to change up the code completely because i didnt know  how to download the JSON file to use 'with open()'
 
-with open() as in_file:
-    # Don't forget to comment your code
-    for line in in_file:
-        # Don't forget to include docstrings for all functions
+# url of the JSON
+file_url = "https://github.com/cbuntain/umd.inst414/blob/main/data/imdb_movies_2000to2022.prolific.json?raw=true"
 
-        # Load the movie from this line
-        this_movie = json.loads(line)
-            
-        # Create a node for every actor
-        for actor_id,actor_name in this_movie['actors']:
-        # add the actor to the graph    
-        # Iterate through the list of actors, generating all pairs
-        ## Starting with the first actor in the list, generate pairs with all subsequent actors
-        ## then continue to second actor in the list and repeat
-        
-        i = 0 #counter
-        for left_actor_id,left_actor_name in this_movie['actors']:
-            for right_actor_id,right_actor_name in this_movie['actors'][i+1:]:
+# read the JSON lines directly using pandas
+df = pd.read_json(file_url, lines=True)
 
-                # Get the current weight, if it exists
-                
-                
-                # Add an edge for these actors
-                
-                
+# tterate through movies
+for _, this_movie in df.iterrows():
+    # add nodes for every actor
+    for actor_id, actor_name in this_movie['actors']:
+        g.add_node(actor_name)
 
+    # add edges for every pair of actors
+    actors = this_movie['actors']
+    for i, (left_actor_id, left_actor_name) in enumerate(actors):
+        for right_actor_id, right_actor_name in actors[i+1:]:
+            if g.has_edge(left_actor_name, right_actor_name):
+                g[left_actor_name][right_actor_name]['weight'] += 1
+            else:
+                g.add_edge(left_actor_name, right_actor_name, weight=1)
 
-# Print the info below
+# print info
 print("Nodes:", len(g.nodes))
 
-#Print the 10 the most central nodes
+# top 10 central nodes
+degree_centrality = nx.degree_centrality(g)
+top_10 = sorted(degree_centrality.items(), key=lambda x: x[1], reverse=True)[:10]
+print("Top 10 most central nodes:")
+for actor, centrality in top_10:
+    print(actor, centrality)
 
+# save edge list to CSV
+current_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
+output_file = f'data/network_centrality_{current_datetime}.csv'
 
-# Output the final dataframe to a CSV named 'network_centrality_{current_datetime}.csv' to `/data`
+edge_list = [{'left_actor_name': u, '<->': data['weight'], 'right_actor_name': v} 
+             for u, v, data in g.edges(data=True)]
 
+pd.DataFrame(edge_list).to_csv(output_file, index=False)
+print(f"Network data saved to {output_file}")
