@@ -25,3 +25,57 @@ Using the imbd_movies dataset:
 '''
 
 #Write your code below
+
+import pandas as pd
+import numpy as np
+from sklearn.metrics import pairwise_distances
+from datetime import datetime
+
+# read the JSON dataset directly from the URL
+file_url = "https://github.com/cbuntain/umd.inst414/blob/main/data/imdb_movies_2000to2022.prolific.json?raw=true"
+df = pd.read_json(file_url, lines=True)
+
+# build the actor-genre matrix
+actor_genre = {}
+
+for _, row in df.iterrows():
+    genres = row['genres']  # list of genres for this movie
+    actors = row['actors']  # list of tuples (actor_id, actor_name)
+    
+    for actor_id, actor_name in actors:
+        if actor_id not in actor_genre:
+            actor_genre[actor_id] = {'name': actor_name}
+        # count genres
+        for genre in genres:
+            actor_genre[actor_id][genre] = actor_genre[actor_id].get(genre, 0) + 1
+
+# convert to DataFrame
+actor_genre_df = pd.DataFrame.from_dict(actor_genre, orient='index').fillna(0)
+
+# keep a mapping of actor_id to name
+actor_names = actor_genre_df.pop('name')
+
+# select query actor
+query_actor_id = 'nm1165110'  # Chris Hemsworth
+query_vector = actor_genre_df.loc[query_actor_id].values.reshape(1, -1)
+
+# compute cosine distances
+distances = pairwise_distances(actor_genre_df.values, query_vector, metric='cosine').flatten()
+
+# combine with actor IDs
+results_df = pd.DataFrame({
+    'actor_id': actor_genre_df.index,
+    'actor_name': actor_names.values,
+    'cosine_distance': distances
+})
+
+# sort by smallest distance (most similar)
+top_10 = results_df.sort_values('cosine_distance').iloc[1:11]  # skip the query itself
+
+# save to CSV
+current_datetime = datetime.now().strftime("%Y%m%d_%H%M%S")
+output_file = f'data/similar_actors_genre_{current_datetime}.csv'
+top_10.to_csv(output_file, index=False)
+
+print(f"Top 10 most similar actors to Chris Hemsworth saved to {output_file}")
+
